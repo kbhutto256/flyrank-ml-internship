@@ -1,1 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>When a Better Split Beats a Better Model</title>
+<style>
+body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.65;color:#172033;background:#f7f8fb;margin:0}
+main{max-width:920px;margin:auto;padding:48px 24px}
+header,section{background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:28px;margin:0 0 22px}
+h1{font-size:2.5rem;line-height:1.12;margin:.25em 0}.muted{color:#667085}
+table{width:100%;border-collapse:collapse;margin:12px 0}th,td{padding:10px;border-bottom:1px solid #e4e7ec;text-align:left}
+code{background:#eef2f7;padding:.15em .35em;border-radius:5px}.callout{border-left:4px solid #3b82f6;padding-left:16px}
+a{color:#2563eb}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="muted">FlyRank Search Intelligence Capstone · Refresh / Content Opportunity Scoring</div>
+<h1>When a Better Split Beats a Better Model</h1>
+<p>A leakage-aware study of page-decline triage on real FlyRank search data, and why client-grouped validation changed the conclusion from “promising model” to “use a cautious review playbook.”</p>
+</header>
 
+<section>
+<h2>Abstract</h2>
+<p>Can pre-decision search signals identify pages that should be reviewed first for possible visibility decline on clients not seen during training? I built a March 2026 content-level modeling frame from the FlyRank internship warehouse using five Google Search Console signals observed before a fixed decision point, then compared a transparent rule baseline with Logistic Regression. A naive random-row split made the model look substantially stronger, with Precision@50 of 0.620, but client-grouped validation fell to 0.340 against a 0.373 held-out base rate. On the Week-5 grouped split, the transparent rule baseline also beat Logistic Regression on the primary ranking metric, 0.540 versus 0.380. The result is therefore not a model-win story: validation design materially changes the conclusion, so the final output is an explainable, human-reviewed action queue rather than an automated content optimizer.</p>
+</section>
+
+<section>
+<h2>Introduction / Problem statement</h2>
+<p>Content teams rarely have time to inspect every page. The decision this work supports is narrower: <strong>which pages should an analyst inspect first?</strong> A high score means “review sooner,” not “Google will demote this page” and not “refreshing this page will recover traffic.”</p>
+</section>
+
+<section>
+<h2>Data</h2>
+<p>The analysis uses the gated FlyRank internship warehouse and the <code>fact_content_daily_performance</code> table. Features use March 1–15, 2026 and the outcome uses March 16–31, 2026. The executed modeling frame contains 151,981 client-content rows across 44 clients. Only rows with <code>gsc_data_available IS TRUE</code> are used. Client/content IDs, second-half metrics, future-derived fields, private page information, and private query information are excluded from predictors and from this public artifact.</p>
+</section>
+
+<section>
+<h2>Methodology</h2>
+<p>The five features are first-half impressions, clicks, average position, active days, and CTR. The target is <code>decline_proxy = 1</code> when second-half impressions are below 80% of first-half impressions. Logistic Regression is compared with a transparent training-only rule baseline. Precision@50 is the primary metric because the product is a ranked review queue. The decisive validation is client-grouped so no client appears in both training and test. All features end before the label window, raw identifiers are not predictors, and future-derived fields are excluded as leakage checks.</p>
+</section>
+
+<section>
+<h2>Results</h2>
+<h3>Model vs baseline on the same grouped split</h3>
+<table>
+<tr><th>Method</th><th>Precision@50</th><th>PR-AUC</th><th>ROC-AUC</th><th>Balanced accuracy</th><th>Precision</th><th>Recall</th></tr>
+<tr><td>Rule baseline</td><td><strong>0.540</strong></td><td>0.395</td><td>0.543</td><td>0.523</td><td>0.399</td><td>0.464</td></tr>
+<tr><td>Logistic Regression</td><td>0.380</td><td>0.395</td><td>0.549</td><td>0.528</td><td>0.397</td><td>0.575</td></tr>
+</table>
+<h3>Validation design changed the story</h3>
+<table>
+<tr><th>Split</th><th>Base rate</th><th>Precision@50</th><th>PR-AUC</th><th>ROC-AUC</th></tr>
+<tr><td>Naive random row split</td><td>0.327</td><td>0.620</td><td>0.413</td><td>0.597</td></tr>
+<tr><td>Client-grouped split</td><td>0.373</td><td>0.340</td><td>0.395</td><td>0.549</td></tr>
+</table>
+<p class="callout"><strong>Main result.</strong> The most important improvement was not a more complex model. It was a stricter split that exposed sensitivity to client overlap.</p>
+</section>
+
+<section>
+<h2>Limitations &amp; honest framing</h2>
+<p>This is one March 2026 decision window in an unbalanced panel. The decline label is a proxy, not a causal diagnosis. Search movement can reflect seasonality, SERP changes, site changes, demand shifts, technical issues, or other unobserved factors. The learned model did not demonstrate useful grouped Precision@50 lift. This work is directional decision-support, not a claim about Google's ranking algorithm and not proof that refreshing content causes recovery.</p>
+</section>
+
+<section>
+<h2>Ranked recommendations</h2>
+<ol>
+<li><strong>Ranking-depth review:</strong> inspect high-impression pages with weak average position; check competing results, topical gaps, and internal links before rewriting.</li>
+<li><strong>CTR review:</strong> inspect visible pages with weak CTR; check intent fit and SERP presentation.</li>
+<li><strong>Refresh review only with supporting evidence:</strong> check staleness, factual drift, cannibalization, and usefulness; a refresh candidate is not proof of cause.</li>
+<li><strong>Monitor low-evidence pages:</strong> defer edits when opportunity is small or signals are mixed.</li>
+</ol>
+<p>On 13,210 held-out rows, the action layer assigned 12,755 to monitor/low-evidence, 285 to CTR opportunity, and 170 to ranking-depth opportunity.</p>
+</section>
+
+<section>
+<h2>Reproducibility</h2>
+<p>Repository: <a href="https://github.com/kbhutto256/flyrank-ml-internship">github.com/kbhutto256/flyrank-ml-internship</a>.</p>
+<p>Key notebooks include <code>work/notebooks/w03_data_contract.ipynb</code>, <code>w05_model.ipynb</code>, <code>w06_validation_audit.ipynb</code>, <code>w07_action_playbook.ipynb</code>, and <code>capstone.ipynb</code>. Re-running the gated warehouse queries requires authorized read access and a private Hugging Face read token; credentials are never committed.</p>
+</section>
+
+<section>
+<h2>Acknowledgments &amp; data credit</h2>
+<p>Built on the <strong>FlyRank ML Internship dataset</strong>. Data and program credit: <a href="https://flyrank.ai">https://flyrank.ai</a>.</p>
+<p class="muted">Public-safety note: this page publishes aggregate results only. It contains no client names, domains, URLs, private queries, credentials, or raw warehouse exports.</p>
+</section>
+
+</main>
+</body>
+</html>
